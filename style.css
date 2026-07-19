@@ -116,6 +116,208 @@ body {
   box-shadow: var(--shadow-hover);
 }
 
+/* ----- 앱 콘텐츠 숨김 (로그인 전) ----- */
+.app-hidden {
+  display: none;
+}
+
+/* ----- 로그인 화면 ----- */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.login-screen--hidden {
+  display: none;
+}
+
+.login-bg-decoration {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 380px;
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  margin: auto;
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-logo__icon {
+  font-size: 2.6rem;
+  color: var(--green-primary);
+  margin-bottom: 8px;
+  display: inline-block;
+  animation: idleBounce 2.5s ease-in-out infinite;
+}
+
+.login-logo__title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--green-dark), var(--green-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
+}
+
+.login-logo__subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.login-tabs {
+  display: flex;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-full);
+  padding: 4px;
+  margin-bottom: 20px;
+  gap: 4px;
+}
+
+.login-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 10px 0;
+  border-radius: var(--radius-full);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.login-tab.active {
+  background: linear-gradient(135deg, var(--green-light), var(--green-primary));
+  color: white;
+  box-shadow: 0 4px 12px var(--green-glow);
+}
+
+.login-form {
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-form.active {
+  display: flex;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-field label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.login-field label i {
+  color: var(--green-primary);
+  width: 14px;
+}
+
+.login-field .input-field {
+  width: 100%;
+  padding: 12px 14px;
+}
+
+.login-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.login-remember input {
+  display: none;
+}
+
+.login-remember__box {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--green-primary);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  color: transparent;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.login-remember input:checked + .login-remember__box {
+  background: var(--green-primary);
+  color: white;
+}
+
+.login-error {
+  min-height: 1.1em;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--red-bad);
+  text-align: center;
+}
+
+.login-submit {
+  width: 100%;
+  padding: 13px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.login-guest {
+  width: 100%;
+  padding: 13px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 /* ----- 상단 헤더 ----- */
 .header {
   position: sticky;
@@ -1265,13 +1467,34 @@ body {
   width: 100%;
 }
 
-/* ----- 음식 체크리스트 ----- */
+/* ----- 음식 체크리스트 (카테고리별) ----- */
 .food-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.food-category__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--green-dark);
+  margin-bottom: 8px;
+}
+
+.food-category__title i {
+  color: var(--green-primary);
+}
+
+.food-category__grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  max-height: 300px;
-  overflow-y: auto;
 }
 
 .food-check-item {
@@ -1294,7 +1517,24 @@ body {
   border: 1px solid var(--green-primary);
 }
 
+.food-check-item.food-check-item--custom {
+  border: 1px dashed var(--green-primary);
+}
+
 .food-check-item input { display: none; }
+
+.food-check-item__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.food-check-item__ai-badge {
+  font-size: 0.7rem;
+  color: var(--green-primary);
+  flex-shrink: 0;
+}
 
 .food-check-item .check-icon {
   width: 20px;
@@ -1307,11 +1547,70 @@ body {
   font-size: 0.7rem;
   color: transparent;
   transition: all var(--transition);
+  flex-shrink: 0;
 }
 
 .food-check-item.selected .check-icon {
   background: var(--green-primary);
   color: white;
+}
+
+/* ----- 커스텀 음식 직접 입력 (AI 감지) ----- */
+.custom-food-input {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(76, 175, 80, 0.3);
+}
+
+.custom-food-input__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 8px;
+}
+
+.custom-food-input__label i {
+  color: var(--green-primary);
+}
+
+.custom-food-input__row {
+  display: flex;
+  gap: 8px;
+}
+
+.custom-food-input__row .input-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-food-input__btn {
+  white-space: nowrap;
+  padding: 0 16px;
+  font-size: 0.82rem;
+  border-radius: var(--radius-sm);
+}
+
+.custom-food-input__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.custom-food-input__hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+  min-height: 1.4em;
+  transition: color var(--transition);
+}
+
+.custom-food-input__hint.detecting {
+  color: var(--green-primary);
+  font-weight: 700;
+  animation: aiPulse 1s ease-in-out infinite;
 }
 
 /* ----- 설정 ----- */
@@ -1565,6 +1864,11 @@ body {
 @keyframes toastOut {
   from { opacity: 1; }
   to { opacity: 0; transform: translateY(-10px); }
+}
+
+@keyframes aiPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .fade-in {

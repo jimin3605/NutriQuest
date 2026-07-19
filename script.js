@@ -23,6 +23,68 @@ const FOOD_DB = {
   '과일':     { protein: 0, vitamin: 4, calcium: 0, fiber: 3, sodium: 0, sugar: 4, fat: 0, category: 'fruit' }
 };
 
+/* ----- 음식 카테고리 메타데이터 (표시용 라벨/아이콘) ----- */
+const CATEGORY_META = {
+  grain:     { label: '곡류',     icon: 'fa-wheat-awn' },
+  protein:   { label: '단백질',   icon: 'fa-drumstick-bite' },
+  dairy:     { label: '유제품',   icon: 'fa-cheese' },
+  vegetable: { label: '채소',     icon: 'fa-carrot' },
+  fruit:     { label: '과일',     icon: 'fa-apple-whole' },
+  junk:      { label: '정크푸드', icon: 'fa-burger' },
+  soda:      { label: '음료',     icon: 'fa-mug-saucer' },
+  etc:       { label: '기타',     icon: 'fa-utensils' }
+};
+const CATEGORY_ORDER = ['grain', 'protein', 'dairy', 'vegetable', 'fruit', 'junk', 'soda', 'etc'];
+
+/* ----- AI 감지용 카테고리 키워드 사전 (직접 입력 음식 자동 분류) ----- */
+const FOOD_KEYWORDS = {
+  grain:     ['밥', '빵', '면', '국수', '파스타', '시리얼', '떡', '고구마', '감자', '오트밀', '토스트', '죽', '김밥', '누룽지'],
+  protein:   ['고기', '살', '소고기', '돼지고기', '삼겹살', '닭', '계란', '달걀', '두부', '생선', '연어', '참치', '새우', '오징어', '견과', '스테이크', '불고기', '순두부'],
+  dairy:     ['우유', '치즈', '요거트', '요구르트', '아이스크림', '버터', '라떼', '크림'],
+  vegetable: ['채소', '야채', '샐러드', '김치', '나물', '브로콜리', '시금치', '오이', '상추', '토마토', '당근', '깍두기'],
+  fruit:     ['사과', '바나나', '포도', '딸기', '수박', '과일', '오렌지', '귤', '배', '복숭아', '키위', '망고', '멜론', '자몽'],
+  junk:      ['라면', '치킨', '피자', '햄버거', '튀김', '과자', '도넛', '케이크', '핫도그', '떡볶이', '감자튀김', '족발', '초콜릿'],
+  soda:      ['콜라', '사이다', '탄산', '에너지드링크', '주스', '음료수', '커피']
+};
+
+/** 음식 이름으로 카테고리 자동 분류 (키워드 매칭 기반 AI 감지) */
+function classifyFoodCategory(name) {
+  for (const [category, keywords] of Object.entries(FOOD_KEYWORDS)) {
+    if (keywords.some(kw => name.includes(kw))) return category;
+  }
+  return 'etc';
+}
+
+/** 카테고리 내 기존 음식들의 평균 영양치로 신규 음식 영양 추정 */
+function estimateNutritionForCategory(category) {
+  const entries = Object.values(FOOD_DB).filter(f => f.category === category);
+
+  if (!entries.length) {
+    return { protein: 2, vitamin: 1, calcium: 1, fiber: 1, sodium: 2, sugar: 1, fat: 1 };
+  }
+
+  const sum = { protein: 0, vitamin: 0, calcium: 0, fiber: 0, sodium: 0, sugar: 0, fat: 0 };
+  entries.forEach(f => {
+    sum.protein += f.protein;
+    sum.vitamin += f.vitamin;
+    sum.calcium += f.calcium;
+    sum.fiber += f.fiber;
+    sum.sodium += f.sodium;
+    sum.sugar += f.sugar;
+    sum.fat += f.fat;
+  });
+
+  const n = entries.length;
+  const avg = {};
+  Object.keys(sum).forEach(k => { avg[k] = Math.max(0, Math.round(sum[k] / n)); });
+  return avg;
+}
+
+/** 이름으로 음식 정보 조회 (기본 DB + 사용자가 등록한 커스텀 음식 모두 포함) */
+function getFoodInfo(name) {
+  return FOOD_DB[name] || (gameState && gameState.customFoods && gameState.customFoods[name]) || null;
+}
+
 /* ----- 진화 단계 정의 ----- */
 const EVOLUTION_STAGES = [
   { level: 1,  stage: 'chick',    name: '병아리',     scale: 1.0 },
@@ -113,6 +175,7 @@ function createDefaultState() {
     coins: 0,
     stats: { health: 50, focus: 50, strength: 50, immunity: 50, happiness: 50 },
     meals: {},
+    customFoods: {},
     dailyNutrition: { protein: 0, vitamin: 0, calcium: 0, fiber: 0, sodium: 0, sugar: 0, fat: 0 },
     dailyMissions: [],
     missionProgress: {},
@@ -139,10 +202,53 @@ function createDefaultState() {
   };
 }
 
+/* ----- 계정 / 세션 관리 ----- */
+const USERS_KEY = 'nutriquest_users';
+const SESSION_KEY = 'nutriquest_session';
+
+/** 가입된 계정 목록 로드 */
+function loadUsers() {
+  try {
+    return JSON.parse(localStorage.getItem(USERS_KEY)) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+/** 가입된 계정 목록 저장 */
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+/** 현재 로그인된 사용자 아이디 반환 (없으면 게스트) */
+function getCurrentUser() {
+  return localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY) || null;
+}
+
+/** 로그인 세션 저장 (로그인 상태 유지 여부에 따라 저장소 선택) */
+function setCurrentUser(username, remember) {
+  sessionStorage.setItem(SESSION_KEY, username);
+  if (remember) {
+    localStorage.setItem(SESSION_KEY, username);
+  }
+}
+
+/** 로그인 세션 제거 */
+function clearCurrentUser() {
+  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+/** 현재 사용자에 해당하는 저장 데이터 키 */
+function getSaveKey() {
+  const user = getCurrentUser();
+  return user ? `nutriquest_save_${user}` : 'nutriquest_save_guest';
+}
+
 /** localStorage에서 상태 로드 */
 function loadState() {
   try {
-    const saved = localStorage.getItem('nutriquest_save');
+    const saved = localStorage.getItem(getSaveKey());
     if (saved) {
       const parsed = JSON.parse(saved);
       return { ...createDefaultState(), ...parsed };
@@ -155,7 +261,7 @@ function loadState() {
 
 /** localStorage에 상태 저장 */
 function saveState() {
-  localStorage.setItem('nutriquest_save', JSON.stringify(gameState));
+  localStorage.setItem(getSaveKey(), JSON.stringify(gameState));
 }
 
 /** 오늘 날짜 키 (YYYY-MM-DD) */
@@ -190,7 +296,7 @@ function getEvolutionStage(level) {
    게임 로직
    ============================================================ */
 
-let gameState = loadState();
+let gameState = null;
 let currentMealType = null;
 let calendarMonth = new Date().getMonth();
 let calendarYear = new Date().getFullYear();
@@ -303,7 +409,7 @@ function recordMeal(mealType, foods) {
   }
 
   foods.forEach(foodName => {
-    const food = FOOD_DB[foodName];
+    const food = getFoodInfo(foodName);
     if (!food) return;
 
     gameState.dailyNutrition.protein += food.protein;
@@ -419,7 +525,7 @@ function checkMissions() {
           completed = Object.values(gameState.meals).flat().some(f => mission.foods.includes(f));
         } else if (mission.categories) {
           completed = Object.values(gameState.meals).flat().some(f => {
-            const food = FOOD_DB[f];
+            const food = getFoodInfo(f);
             return food && mission.categories.includes(food.category);
           });
         }
@@ -804,6 +910,126 @@ function renderRanking() {
    모달 & UI 이벤트
    ============================================================ */
 
+/* ----- 음식 선택 UI 헬퍼 ----- */
+
+/** 기본 음식 DB + 사용자가 등록한 커스텀 음식을 카테고리별로 그룹화 */
+function buildCategorizedFoodMap() {
+  const map = {};
+  CATEGORY_ORDER.forEach(c => { map[c] = []; });
+
+  Object.keys(FOOD_DB).forEach(name => {
+    const cat = FOOD_DB[name].category;
+    if (!map[cat]) map[cat] = [];
+    map[cat].push({ name, custom: false });
+  });
+
+  Object.keys(gameState.customFoods || {}).forEach(name => {
+    const cat = gameState.customFoods[name].category || 'etc';
+    if (!map[cat]) map[cat] = [];
+    map[cat].push({ name, custom: true });
+  });
+
+  return map;
+}
+
+/** 음식 선택 체크 아이템(라벨) DOM 생성 */
+function renderFoodCheckItem(foodName, checked, custom) {
+  const item = document.createElement('label');
+  item.className = `food-check-item ${checked ? 'selected' : ''} ${custom ? 'food-check-item--custom' : ''}`;
+  item.innerHTML = `
+    <input type="checkbox" value="${foodName}" ${checked ? 'checked' : ''}>
+    <span class="check-icon"><i class="fa-solid fa-check"></i></span>
+    <span class="food-check-item__name">${foodName}</span>
+    ${custom ? '<i class="fa-solid fa-wand-magic-sparkles food-check-item__ai-badge" title="AI가 자동 분류한 음식"></i>' : ''}
+  `;
+
+  item.addEventListener('click', (e) => {
+    e.preventDefault();
+    item.classList.toggle('selected');
+    const input = item.querySelector('input');
+    input.checked = !input.checked;
+  });
+
+  return item;
+}
+
+/** 감지/입력 결과 안내 문구 갱신 */
+function setCustomFoodHint(text, detecting) {
+  const hint = document.getElementById('customFoodHint');
+  hint.textContent = text;
+  hint.classList.toggle('detecting', !!detecting);
+}
+
+/** 체크리스트에 음식 항목을 추가(이미 있으면 체크만) - 카테고리 섹션이 없으면 새로 생성 */
+function addFoodItemToChecklist(name, category, custom) {
+  const checklist = document.getElementById('foodChecklist');
+  let section = Array.from(checklist.querySelectorAll('.food-category'))
+    .find(s => s.dataset.cat === category);
+
+  if (!section) {
+    const meta = CATEGORY_META[category] || CATEGORY_META.etc;
+    section = document.createElement('div');
+    section.className = 'food-category';
+    section.dataset.cat = category;
+    section.innerHTML = `<h4 class="food-category__title"><i class="fa-solid ${meta.icon}"></i> ${meta.label}</h4>`;
+
+    const grid = document.createElement('div');
+    grid.className = 'food-category__grid';
+    section.appendChild(grid);
+    checklist.appendChild(section);
+  }
+
+  const grid = section.querySelector('.food-category__grid');
+  const existingInput = Array.from(grid.querySelectorAll('input')).find(i => i.value === name);
+
+  if (existingInput) {
+    existingInput.checked = true;
+    existingInput.closest('.food-check-item').classList.add('selected');
+    return;
+  }
+
+  grid.appendChild(renderFoodCheckItem(name, true, custom));
+}
+
+/** "AI 감지" 버튼 클릭 시 실행: 이미 등록된 음식이면 바로 추가, 아니면 키워드 분석 후 신규 등록 */
+function handleCustomFoodDetect() {
+  const inputEl = document.getElementById('customFoodInput');
+  const name = inputEl.value.trim();
+
+  if (!name) {
+    setCustomFoodHint('음식 이름을 입력해주세요!', false);
+    return;
+  }
+
+  const existing = getFoodInfo(name);
+  if (existing) {
+    addFoodItemToChecklist(name, existing.category, !!(gameState.customFoods && gameState.customFoods[name]));
+    setCustomFoodHint(`'${name}'은(는) 이미 등록된 음식이에요. 선택 목록에 추가했어요!`, false);
+    inputEl.value = '';
+    return;
+  }
+
+  const btn = document.getElementById('customFoodAddBtn');
+  btn.disabled = true;
+  setCustomFoodHint('🔍 AI가 영양 성분을 분석하는 중...', true);
+
+  setTimeout(() => {
+    const category = classifyFoodCategory(name);
+    const nutrition = estimateNutritionForCategory(category);
+
+    gameState.customFoods = gameState.customFoods || {};
+    gameState.customFoods[name] = { ...nutrition, category };
+    saveState();
+
+    addFoodItemToChecklist(name, category, true);
+
+    const meta = CATEGORY_META[category] || CATEGORY_META.etc;
+    setCustomFoodHint(`✨ AI 감지 완료! '${name}' → ${meta.label}(으)로 분류해서 추가했어요.`, false);
+    inputEl.value = '';
+    btn.disabled = false;
+  }, 700);
+}
+
 function openMealModal(mealType) {
   currentMealType = mealType;
   const info = MEAL_LABELS[mealType];
@@ -815,25 +1041,31 @@ function openMealModal(mealType) {
   checklist.innerHTML = '';
 
   const currentFoods = gameState.meals[mealType] || [];
+  const categoryMap = buildCategorizedFoodMap();
 
-  Object.keys(FOOD_DB).forEach(foodName => {
-    const item = document.createElement('label');
-    item.className = `food-check-item ${currentFoods.includes(foodName) ? 'selected' : ''}`;
-    item.innerHTML = `
-      <input type="checkbox" value="${foodName}" ${currentFoods.includes(foodName) ? 'checked' : ''}>
-      <span class="check-icon"><i class="fa-solid fa-check"></i></span>
-      ${foodName}
-    `;
+  CATEGORY_ORDER.forEach(cat => {
+    const items = categoryMap[cat];
+    if (!items || !items.length) return;
 
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      item.classList.toggle('selected');
-      const input = item.querySelector('input');
-      input.checked = !input.checked;
+    const meta = CATEGORY_META[cat] || CATEGORY_META.etc;
+    const section = document.createElement('div');
+    section.className = 'food-category';
+    section.dataset.cat = cat;
+    section.innerHTML = `<h4 class="food-category__title"><i class="fa-solid ${meta.icon}"></i> ${meta.label}</h4>`;
+
+    const grid = document.createElement('div');
+    grid.className = 'food-category__grid';
+
+    items.forEach(({ name, custom }) => {
+      grid.appendChild(renderFoodCheckItem(name, currentFoods.includes(name), custom));
     });
 
-    checklist.appendChild(item);
+    section.appendChild(grid);
+    checklist.appendChild(section);
   });
+
+  document.getElementById('customFoodInput').value = '';
+  setCustomFoodHint('직접 먹은 음식을 입력하면 AI가 카테고리와 영양성분을 자동으로 분석해요!', false);
 
   document.getElementById('mealModal').classList.add('active');
 }
@@ -917,6 +1149,14 @@ function initEventListeners() {
   document.getElementById('mealModalCancel').addEventListener('click', closeMealModal);
   document.getElementById('mealModalSave').addEventListener('click', saveMealRecord);
 
+  document.getElementById('customFoodAddBtn').addEventListener('click', handleCustomFoodDetect);
+  document.getElementById('customFoodInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCustomFoodDetect();
+    }
+  });
+
   document.getElementById('settingsBtn').addEventListener('click', () => {
     document.getElementById('nicknameInput').value = gameState.nickname;
     document.getElementById('soundToggle').checked = gameState.soundEnabled;
@@ -940,7 +1180,7 @@ function initEventListeners() {
 
   document.getElementById('resetDataBtn').addEventListener('click', () => {
     if (confirm('정말 모든 데이터를 초기화할까요?')) {
-      localStorage.removeItem('nutriquest_save');
+      localStorage.removeItem(getSaveKey());
       gameState = createDefaultState();
       checkDailyReset();
       saveState();
@@ -948,6 +1188,12 @@ function initEventListeners() {
       document.getElementById('settingsModal').classList.remove('active');
       showToast('데이터가 초기화되었습니다.', 'fa-trash');
     }
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    clearCurrentUser();
+    document.getElementById('settingsModal').classList.remove('active');
+    location.reload();
   });
 
   document.getElementById('levelUpClose').addEventListener('click', () => {
@@ -983,14 +1229,112 @@ function initEventListeners() {
 }
 
 /* ============================================================
-   앱 초기화
+   로그인 화면 & 앱 초기화
    ============================================================ */
 
-function init() {
+/** 로그인 완료 후 실제 앱 시작 */
+function startApp() {
+  gameState = loadState();
+
+  document.getElementById('loginScreen').classList.add('login-screen--hidden');
+  document.getElementById('appRoot').classList.remove('app-hidden');
+
   checkDailyReset();
   initEventListeners();
   updateUI();
   console.log('🐤 NutriQuest 시작! 즐거운 식습관 관리 되세요!');
 }
 
-document.addEventListener('DOMContentLoaded', init);
+/** 로그인 화면 이벤트 초기화 */
+function initLoginScreen() {
+  const loginTabs = document.querySelectorAll('.login-tab');
+  const loginForm = document.getElementById('loginForm');
+  const signupForm = document.getElementById('signupForm');
+  const loginError = document.getElementById('loginError');
+  const signupError = document.getElementById('signupError');
+
+  loginTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      loginTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
+      document.getElementById(`${tab.dataset.form}Form`).classList.add('active');
+      loginError.textContent = '';
+      signupError.textContent = '';
+    });
+  });
+
+  loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const remember = document.getElementById('rememberMe').checked;
+
+    if (!username || !password) {
+      loginError.textContent = '아이디와 비밀번호를 입력해주세요.';
+      return;
+    }
+
+    const users = loadUsers();
+    const user = users[username];
+
+    if (!user || user.password !== password) {
+      loginError.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
+      return;
+    }
+
+    loginError.textContent = '';
+    setCurrentUser(username, remember);
+    startApp();
+  });
+
+  signupForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const username = document.getElementById('signupUsername').value.trim();
+    const nickname = document.getElementById('signupNickname').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
+
+    if (!username || !nickname || !password || !passwordConfirm) {
+      signupError.textContent = '모든 항목을 입력해주세요.';
+      return;
+    }
+    if (password.length < 4) {
+      signupError.textContent = '비밀번호는 4자 이상이어야 합니다.';
+      return;
+    }
+    if (password !== passwordConfirm) {
+      signupError.textContent = '비밀번호가 일치하지 않습니다.';
+      return;
+    }
+
+    const users = loadUsers();
+    if (users[username]) {
+      signupError.textContent = '이미 사용 중인 아이디입니다.';
+      return;
+    }
+
+    users[username] = { password, nickname };
+    saveUsers(users);
+    signupError.textContent = '';
+    setCurrentUser(username, true);
+
+    gameState = createDefaultState();
+    gameState.nickname = nickname;
+    localStorage.setItem(getSaveKey(), JSON.stringify(gameState));
+
+    startApp();
+  });
+
+  document.getElementById('guestLoginBtn').addEventListener('click', () => {
+    clearCurrentUser();
+    startApp();
+  });
+
+  // 로그인 상태 유지가 되어 있으면 자동으로 앱 시작
+  if (getCurrentUser()) {
+    startApp();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initLoginScreen);
